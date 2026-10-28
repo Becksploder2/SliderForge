@@ -5,6 +5,7 @@ import sqlite3, csv, json
 import sys
 from pathlib import Path
 from team_background import TeamBackground
+import branding
 
 ROOT=Path.home()/".sliderforge"
 ROOT.mkdir(exist_ok=True)
@@ -31,6 +32,7 @@ TEAMS=sorted(set(TEAMS)|{r[0] for r in csv.reader(asset_path("cfb27_official_rat
 SLIDERS=["QB Accuracy","Pass Blocking","WR Catching","Run Blocking","Ball Security","Pass Defense Reaction Time","Interceptions","Pass Coverage","Tackling","FG Power","FG Accuracy","Punt Power","Punt Accuracy","Kickoff Power","Offside","False Start","Holding","Facemask","Defensive Pass Interference","Offensive Pass Interference","Illegal Block in the Back","Roughing the Passer","Roughing the Kicker","Running into the Kicker"]
 NFL_TEAMS=sorted("""Arizona Cardinals|Atlanta Falcons|Baltimore Ravens|Buffalo Bills|Carolina Panthers|Chicago Bears|Cincinnati Bengals|Cleveland Browns|Dallas Cowboys|Denver Broncos|Detroit Lions|Green Bay Packers|Houston Texans|Indianapolis Colts|Jacksonville Jaguars|Kansas City Chiefs|Las Vegas Raiders|Los Angeles Chargers|Los Angeles Rams|Miami Dolphins|Minnesota Vikings|New England Patriots|New Orleans Saints|New York Giants|New York Jets|Philadelphia Eagles|Pittsburgh Steelers|San Francisco 49ers|Seattle Seahawks|Tampa Bay Buccaneers|Tennessee Titans|Washington Commanders""".split("|"))
 CFB_TEAMS=TEAMS[:]
+branding.OFFICIAL.update(CFB_TEAMS)
 GAME_CHOICES=["College Football 25","College Football 26","College Football 27","Madden NFL 25","Madden NFL 26","Madden NFL 27","NHL 25","NHL 26","NHL 27"]
 def game_key(label):
  return ("N" if label.startswith("NHL") else "M" if label.startswith("Madden") else "C")+label[-2:]
