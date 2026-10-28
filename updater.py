@@ -1,6 +1,6 @@
 
 """GitHub Releases updater for SliderForge. Standard library only."""
-import json, re, urllib.request, urllib.error, zipfile, hashlib
+import json, re, urllib.request, urllib.error, zipfile, hashlib, os, sys, subprocess, tempfile
 from pathlib import Path
 
 VERSION="1.3.0"
@@ -83,3 +83,37 @@ def download_asset(asset):
         return target
     finally:
         temp.unlink(missing_ok=True)
+
+def install_windows_release(archive):
+    """Install a trusted GitHub release ZIP after the user confirms the update."""
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        raise RuntimeError("Automatic installation requires the packaged Windows EXE.")
+    executable = Path(sys.executable).resolve()
+    with zipfile.ZipFile(archive) as z:
+        candidates = [n for n in z.namelist() if Path(n).name.lower() == "sliderforge.exe" and len(Path(n).parts) <= 2]
+        if len(candidates) != 1:
+            raise ValueError("Release ZIP must contain one SliderForge.exe")
+        temp_dir = Path(tempfile.mkdtemp(prefix="sliderforge-update-"))
+        staged = temp_dir / "SliderForge.exe"
+        with z.open(candidates[0]) as src, staged.open("wb") as dst:
+            import shutil
+            shutil.copyfileobj(src, dst)
+        if staged.stat().st_size < 100000:
+            raise ValueError("Downloaded executable is unexpectedly small")
+    # The helper waits for the running EXE to exit, then swaps the file and relaunches.
+    # No downloaded scripts are executed. The local PowerShell helper runs invisibly.
+    script = temp_dir / "install.ps1"
+    dest = str(executable).replace("'", "''")
+    src = str(staged).replace("'", "''")
+    script.write_text(
+        "$ErrorActionPreference='Stop'\n"
+        "$source='"+src+"'\n"
+        "$target='"+dest+"'\n"
+        "Start-Sleep -Seconds 2\n"
+        "for($i=0;$i -lt 60;$i++){try{Copy-Item -LiteralPath $source -Destination $target -Force; Start-Process -FilePath $target; exit 0}catch{Start-Sleep -Seconds 1}}\n"
+        "exit 1\n", encoding="utf-8")
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    subprocess.Popen(["powershell.exe", "-NoProfile", "-NonInteractive",
+                      "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
+                      "-File", str(script)], creationflags=flags,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
