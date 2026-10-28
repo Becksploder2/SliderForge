@@ -3,10 +3,6 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import sqlite3, csv, json
 import sys
-import threading
-import webbrowser
-import updater
-import branding
 from pathlib import Path
 
 ROOT=Path.home()/".sliderforge"
@@ -43,20 +39,6 @@ def game_modes(label):
  return ("Franchise","Be a Pro","Play Now") if game_family(label)=="NHL" else ("Franchise","Superstar","Exhibition") if game_family(label)=="Madden" else ("Dynasty","Road to Glory","Exhibition")
 
 NHL_TEAMS=sorted("""Anaheim Ducks|Boston Bruins|Buffalo Sabres|Calgary Flames|Carolina Hurricanes|Chicago Blackhawks|Colorado Avalanche|Columbus Blue Jackets|Dallas Stars|Detroit Red Wings|Edmonton Oilers|Florida Panthers|Los Angeles Kings|Minnesota Wild|Montreal Canadiens|Nashville Predators|New Jersey Devils|New York Islanders|New York Rangers|Ottawa Senators|Philadelphia Flyers|Pittsburgh Penguins|San Jose Sharks|Seattle Kraken|St. Louis Blues|Tampa Bay Lightning|Toronto Maple Leafs|Vancouver Canucks|Vegas Golden Knights|Washington Capitals|Winnipeg Jets|Utah Hockey Club|Utah Mammoth""".split("|"))
-# PWHL lists reflect the league's teams by season, not guaranteed in-game roster availability.
-PWHL_ORIGINAL=["Boston Fleet","Minnesota Frost","Montréal Victoire","New York Sirens","Ottawa Charge","Toronto Sceptres"]
-PWHL_2026=["Seattle Torrent","Vancouver Goldeneyes"]
-PWHL_2027=["PWHL Detroit","PWHL Hamilton","PWHL Las Vegas","PWHL San Jose"]
-def pwhl_teams_for_game(game):
- teams=PWHL_ORIGINAL[:]
- if game in ("NHL 26","NHL 27"):teams+=PWHL_2026
- if game=="NHL 27":teams+=PWHL_2027
- return sorted(teams)
-def nhl_teams_for_game(game):
- teams=[team for team in NHL_TEAMS if team not in ("Utah Hockey Club", "Utah Mammoth")]
- teams.append("Utah Hockey Club" if game == "NHL 25" else "Utah Mammoth")
- return sorted(teams)+["──── PWHL (league teams; game availability unverified) ────"]+pwhl_teams_for_game(game)
-
 # Candidate hockey slider labels; confirm the exact in-game labels and availability per edition.
 NHL_SLIDER_GROUPS={
  "General":["Game Speed","Fatigue Effect","Fatigue Recovery","Injury Occurrence"],
@@ -73,12 +55,10 @@ FOOTBALL_SLIDER_GROUPS={"Offense":SLIDERS[:5],"Defense":SLIDERS[5:9],"Special Te
 
 class App:
  def __init__(self,root):
-  self.root=root;root.title("SliderForge v1.3 Beta — Stadium Branding");root.geometry("1180x810");root.configure(bg="#17221d")
+  self.root=root;root.title("SliderForge v1.1 Beta — Football + NHL (25–27)");root.geometry("1180x810");root.configure(bg="#17221d")
   self.game=tk.StringVar(value="College Football 27");self.mode=tk.StringVar(value="Dynasty");self.career=tk.StringVar(value="My Dynasty");self.season=tk.StringVar(value="2026")
   self.home=tk.StringVar(value="East Carolina");self.away=tk.StringVar(value="Charlotte");self.primary_team=tk.StringVar(value="East Carolina");self.opponent=tk.StringVar(value="Charlotte");self.venue=tk.StringVar(value="HOME");self.status=tk.StringVar(value="Ready — ratings require verified import or manual entry")
-  branding.OFFICIAL=set(CFB_TEAMS)
   self.sliders={}
-  self._branding_photo=None
   self._loading_profile=False
   self.lock_status=tk.StringVar(value="Season profile not locked")
   self.controlled=tk.StringVar(value="HOME")
@@ -89,25 +69,8 @@ class App:
   style.configure("Title.TLabel",font=("Segoe UI",22,"bold"),foreground="#8df3a2")
   style.configure("TButton",padding=7)
   frame=ttk.Frame(root,padding=16);frame.pack(fill="both",expand=True)
-  header=ttk.Frame(frame);header.pack(fill="x")
-  ttk.Label(header,text="SLIDERFORGE",style="Title.TLabel").pack(side="left")
-  ttk.Button(header,text="Check for Updates",command=self.check_updates).pack(side="right",padx=4)
-  ttk.Button(header,text="Update Settings",command=self.update_settings).pack(side="right",padx=4)
-  self.branding_panel=ttk.Frame(frame)
-  self.branding_panel.pack(fill="x",pady=(4,10))
-  self.branding_canvas=tk.Canvas(self.branding_panel,height=165,bg="#142b25",highlightthickness=0)
-  self.branding_canvas.pack(fill="x")
-  branding_actions=ttk.Frame(self.branding_panel);branding_actions.pack(fill="x",pady=(3,0))
-  ttk.Button(branding_actions,text="New TeamBuilder Team",command=self.new_teambuilder).pack(side="left",padx=3)
-  ttk.Button(branding_actions,text="Import Team Logo",command=self.import_team_logo).pack(side="left",padx=3)
-  ttk.Button(branding_actions,text="Import Stadium Photo",command=self.import_stadium).pack(side="left",padx=3)
-  ttk.Button(branding_actions,text="Reset Stadium",command=self.reset_stadium).pack(side="left",padx=3)
-  ttk.Button(branding_actions,text="Remove Logo",command=self.remove_logo).pack(side="left",padx=3)
-  ttk.Label(branding_actions,text="Custom team → generic stadium by default").pack(side="right")
-  self.branding_canvas.bind("<Configure>",lambda e:self.refresh_branding())
-  self.primary_team.trace_add("write",lambda *_:self.refresh_branding())
-  self.game.trace_add("write",lambda *_:self.refresh_branding())
-  ttk.Label(frame,text="YOUR GAME. YOUR DIFFICULTY. YOUR RULES.  •  Recommendations only; apply in-game manually").pack(anchor="w",pady=(0,10))
+  ttk.Label(frame,text="SLIDERFORGE",style="Title.TLabel").pack(anchor="w")
+  ttk.Label(frame,text="YOUR GAME. YOUR DIFFICULTY. YOUR RULES.  •  Recommendations only; apply in-game manually").pack(anchor="w",pady=(0,15))
   top=ttk.Frame(frame);top.pack(fill="x")
   self.field(top,"Game",self.game,GAME_CHOICES,width=22)
   self.mode_tabs=ttk.Notebook(frame)
@@ -158,117 +121,6 @@ class App:
   self.mode_tabs.select(self.mode_frames["Dynasty"])
   self.game.trace_add("write",lambda *_:self.on_game_changed())
   self.on_game_changed()
- def new_teambuilder(self):
-  if game_family(self.game.get())!="College Football":
-   messagebox.showinfo("TeamBuilder", "TeamBuilder customization is available for College Football editions.");return
-  from tkinter import simpledialog
-  name=simpledialog.askstring("TeamBuilder Team","Enter a TeamBuilder team name:",parent=self.root)
-  if name and name.strip():self.primary_team.set("Custom: "+name.strip().removeprefix("Custom: "))
- def branding_team(self):
-  return self.primary_team.get().strip()
- def import_team_logo(self):
-  team=self.branding_team()
-  if not team:return messagebox.showwarning("Choose team","Select or enter a team first.")
-  path=filedialog.askopenfilename(title="Choose team logo",filetypes=[("Image files","*.png *.jpg *.jpeg *.webp")])
-  if path:
-   try:branding.store_asset(self.game.get(),team,"logo",path)
-   except Exception as e:return messagebox.showerror("Import failed",str(e))
-   self.refresh_branding()
- def import_stadium(self):
-  team=self.branding_team()
-  if not team:return messagebox.showwarning("Choose team","Select or enter a team first.")
-  path=filedialog.askopenfilename(title="Choose stadium photo or TeamBuilder screenshot",filetypes=[("Image files","*.png *.jpg *.jpeg *.webp")])
-  if path:
-   try:branding.store_asset(self.game.get(),team,"stadium",path)
-   except Exception as e:return messagebox.showerror("Import failed",str(e))
-   self.refresh_branding()
- def reset_stadium(self):
-  branding.remove_asset(self.game.get(),self.branding_team(),"stadium")
-  self.refresh_branding()
- def remove_logo(self):
-  branding.remove_asset(self.game.get(),self.branding_team(),"logo")
-  self.refresh_branding()
- def refresh_branding(self):
-  if not hasattr(self,"branding_canvas"):return
-  c=self.branding_canvas
-  w=max(600,c.winfo_width());h=165
-  c.delete("all")
-  team=self.branding_team()
-  game=self.game.get()
-  custom=branding.is_custom_team(team)
-  stadium=branding.stadium_label(team,game)
-  img=branding.load_photo(branding.get_asset(game,team,"stadium"),(w,h))
-  self._branding_photo=img
-  if img:
-   c.create_image(w//2,h//2,image=img)
-   c.create_rectangle(0,0,w,h,fill="#07130f",stipple="gray50",outline="")
-  else:
-   c.create_rectangle(0,0,w,h,fill="#183d30",outline="")
-   for i in range(0,w,45):c.create_line(i,0,i+80,h,fill="#285342",width=2)
-   c.create_rectangle(w*.07,20,w*.93,h-18,outline="#7fa18e",width=2)
-   c.create_line(w*.5,20,w*.5,h-18,fill="#7fa18e",width=2)
-   c.create_oval(w*.5-32,h*.5-32,w*.5+32,h*.5+32,outline="#7fa18e",width=2)
-  c.create_rectangle(12,15,w*.55,148,fill="#0c1b18",outline="#597468")
-  c.create_text(27,38,anchor="w",text=team[:43] or "Select a team",font=("Segoe UI",18,"bold"),fill="white")
-  c.create_text(27,71,anchor="w",text=stadium[:58],font=("Segoe UI",11),fill="#b6e2c8")
-  c.create_text(27,103,anchor="w",text=("TeamBuilder / Custom team" if custom else game),font=("Segoe UI",10),fill="#e5e5e5")
-  logo=branding.load_photo(branding.get_asset(game,team,"logo"),(130,130))
-  self._branding_logo=logo
-  if logo:c.create_image(w-92,h//2,image=logo)
-  else:
-   c.create_oval(w-151,15,w-24,142,fill="#123127",outline="#83bd9b",width=3)
-   c.create_text(w-87,78,text=branding.initials(team),font=("Segoe UI",26,"bold"),fill="white")
- def update_settings(self):
-  win=tk.Toplevel(self.root);win.title("GitHub Update Settings");win.geometry("490x205");win.transient(self.root)
-  win.grab_set()
-  cfg=updater.settings()
-  repo=tk.StringVar(value=cfg.get("repo",""))
-  channel=tk.StringVar(value=cfg.get("channel","stable"))
-  ttk.Label(win,text="GitHub repository (owner/SliderForge)").pack(anchor="w",padx=12,pady=(12,2))
-  ttk.Entry(win,textvariable=repo,width=55).pack(fill="x",padx=12)
-  ttk.Label(win,text="Release channel").pack(anchor="w",padx=12,pady=(10,2))
-  ttk.Combobox(win,textvariable=channel,values=["stable","beta"],state="readonly").pack(fill="x",padx=12)
-  def save():
-   try:updater.save_settings(repo.get(),channel.get())
-   except ValueError as e:messagebox.showerror("Invalid repository",str(e),parent=win);return
-   win.destroy()
-   self.status.set("GitHub updater configured. Use Check for Updates.")
-  ttk.Button(win,text="Save",command=save).pack(pady=10)
- def check_updates(self):
-  self.status.set("Checking GitHub Releases…")
-  def worker():
-   try:result=updater.check()
-   except Exception as e:
-    self.root.after(0,lambda msg=str(e):self._update_error(msg))
-    return
-   self.root.after(0,lambda:self._update_result(result))
-  threading.Thread(target=worker,daemon=True).start()
- def _update_error(self,msg):
-  self.status.set("Update check failed: "+msg)
-  messagebox.showerror("GitHub update check",msg,parent=self.root)
- def _update_result(self,result):
-  release=result["release"]
-  if not result["newer"]:
-   messagebox.showinfo("SliderForge updates","You're up to date (v"+updater.VERSION+")." if release else "No eligible GitHub releases found.",parent=self.root)
-   self.status.set("Update check complete.")
-   return
-  asset=result["asset"]
-  tag=release.get("tag_name","new release")
-  if not asset:
-   if messagebox.askyesno("New release",tag+" is available, but has no SliderForge ZIP. Open release page?",parent=self.root):
-    webbrowser.open(release["html_url"])
-   return
-  if not messagebox.askyesno("Update available",tag+" is available. Download "+asset["name"]+" to your SliderForge downloads folder?\n\nThe app will NOT replace files while running.",parent=self.root):
-   return
-  self.status.set("Downloading "+asset["name"]+"…")
-  def worker():
-   try:target=updater.download_asset(asset)
-   except Exception as e:self.root.after(0,lambda msg=str(e):self._update_error(msg));return
-   self.root.after(0,lambda:self._update_downloaded(target))
-  threading.Thread(target=worker,daemon=True).start()
- def _update_downloaded(self,target):
-  self.status.set("Downloaded verified ZIP: "+str(target))
-  messagebox.showinfo("Update downloaded","Update saved to:\n"+str(target)+"\n\nClose SliderForge, extract the ZIP into a NEW folder, and launch the updated START_WINDOWS.bat. Your profiles are stored separately in ~/.sliderforge.\n\nAutomatic installation is not enabled yet.",parent=self.root)
  def render_sliders(self):
   if not hasattr(self,"slider_notebook"):return
   for tab in self.slider_notebook.tabs():self.slider_notebook.forget(tab)
@@ -309,7 +161,7 @@ class App:
   if self.mode.get() not in modes:
    self.mode_tabs.select(self.mode_frames[modes[0]])
    self.on_mode_tab()
-  teams=nhl_teams_for_game(self.game.get()) if family=="NHL" else NFL_TEAMS if family=="Madden" else CFB_TEAMS
+  teams=NHL_TEAMS if family=="NHL" else NFL_TEAMS if family=="Madden" else CFB_TEAMS
   self.primary_team.set("Dallas Stars" if family=="NHL" else "Dallas Cowboys" if family=="Madden" else "East Carolina")
   self.opponent.set("Colorado Avalanche" if family=="NHL" else "Philadelphia Eagles" if family=="Madden" else "Charlotte")
   # Refresh every team selector, including the Exhibition opponent.
@@ -318,17 +170,13 @@ class App:
   self.difficulty_box.configure(values=["Rookie","Semi-Pro","Pro","All-Star","Superstar"] if family=="NHL" else ["Rookie","Pro","All-Pro","All-Madden"] if family=="Madden" else ["Freshman","Varsity","All-American","Heisman"])
   self.difficulty.set("Pro" if family in ("Madden","NHL") else "Varsity")
   self.render_sliders()
-  self.status.set("Selected "+self.game.get()+". PWHL teams are included by league season; in-game availability unverified. Experimental sliders.")
+  self.status.set("Selected "+self.game.get()+". Ratings are not preloaded for this title unless imported. Experimental True Balance preset.")
   self.refresh()
  def _set_team_choices(self,widget,teams):
   if isinstance(widget,ttk.Combobox) and widget.cget("textvariable") in (str(self.primary_team),str(self.opponent)):
    widget.configure(values=teams)
   for child in widget.winfo_children():self._set_team_choices(child,teams)
  def sync_teams(self):
-  if self.primary_team.get().startswith("────"):
-   self.primary_team.set("Dallas Stars")
-  if self.opponent.get().startswith("────"):
-   self.opponent.set("Colorado Avalanche")
   # Home/away are retained solely for game-result logging and capture-card compatibility.
   if self.venue.get()=="HOME":
    self.home.set(self.primary_team.get());self.away.set(self.opponent.get())
@@ -379,7 +227,7 @@ class App:
  def field(self,parent,label,var,choices,width=18):
   f=ttk.Frame(parent);f.pack(side="left",padx=(0,13))
   ttk.Label(f,text=label).pack(anchor="w")
-  if choices:ttk.Combobox(f,textvariable=var,values=choices,width=width,state="normal" if var is self.primary_team else "readonly").pack()
+  if choices:ttk.Combobox(f,textvariable=var,values=choices,width=width,state="readonly").pack()
   else:ttk.Entry(f,textvariable=var,width=width).pack()
  def key(self):
   mode=self.mode.get()
