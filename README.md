@@ -24,6 +24,14 @@ For a **TeamBuilder team**, click **New TeamBuilder Team**, enter the team name,
 
 Branding is saved under `%USERPROFILE%\.sliderforge\branding` and is recalled per game/team. Existing slider profiles are stored separately in `%USERPROFILE%\.sliderforge\sliderforge.db`.
 
+## Automated Windows beta releases
+
+Every push to `main` now runs GitHub Actions to compile the Tkinter application, package a standalone `SliderForge.exe`, create `SliderForge_Windows.zip`, generate a SHA-256 checksum, and publish a GitHub **prerelease** with the files attached if the build succeeds. Tags are generated as `v1.3.<GitHub run number>` for compatibility with the existing updater. There is also a manual workflow trigger.
+
+Download current builds from [Releases](https://github.com/Becksploder2/SliderForge/releases). Windows does not need Python or PowerShell to run the packaged EXE. Beta builds are not code-signed, so Windows SmartScreen may warn.
+
+The updater currently **downloads** a new release ZIP but does not install it automatically. Build and release publication are automated; integration testing on a real Windows desktop is still required.
+
 ## Updates
 
 The built-in updater checks the releases of this repository (beta channel by default). It downloads a validated update ZIP, but **does not automatically install** it. Release tags must have a semantic version such as `v1.3.1`.
