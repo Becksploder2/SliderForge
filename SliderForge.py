@@ -3,6 +3,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import sqlite3, csv, json
 import sys
+import threading
+import updater
 from pathlib import Path
 from team_background import TeamBackground
 import branding
@@ -73,6 +75,12 @@ class App:
   style.configure("TButton",padding=7)
   frame=ttk.Frame(root,padding=10);frame.pack(fill="both",expand=True)
   self.team_background=TeamBackground(frame,self.game,self.primary_team,self.opponent,self.venue)
+  update_row=ttk.Frame(frame);update_row.pack(fill="x")
+  ttk.Button(update_row,text="Check for updates",command=self.check_for_updates).pack(side="right")
+  self.update_label=ttk.Label(update_row,text="GitHub updates enabled")
+  self.update_label.pack(side="right",padx=12)
+  root.after(2500,self.check_for_updates)
+
   top=ttk.Frame(frame);top.pack(fill="x")
   self.field(top,"Game",self.game,GAME_CHOICES,width=22)
   self.mode_tabs=ttk.Notebook(frame)
@@ -123,6 +131,43 @@ class App:
   self.mode_tabs.select(self.mode_frames["Dynasty"])
   self.game.trace_add("write",lambda *_:self.on_game_changed())
   self.on_game_changed()
+
+ def check_for_updates(self):
+  def worker():
+   try:
+    result=updater.check()
+    self.root.after(0,lambda:self.offer_update(result))
+   except Exception:
+    self.root.after(0,lambda:self.update_label.configure(text="Update check unavailable"))
+  threading.Thread(target=worker,daemon=True).start()
+ def offer_update(self,result):
+  if not result.get("newer"):
+   self.update_label.configure(text="Up to date")
+   return
+  asset=result.get("asset")
+  if not asset:
+   self.update_label.configure(text="Release ZIP unavailable")
+   return
+  version=result["release"]["tag_name"]
+  self.update_label.configure(text="Update: "+version)
+  if not messagebox.askyesno("SliderForge update","Install "+version+" from GitHub? SliderForge will restart."):
+   return
+  self.update_label.configure(text="Downloading "+version)
+  def worker():
+   try:
+    archive=updater.download_asset(asset)
+    self.root.after(0,lambda:self.install_update(archive))
+   except Exception as exc:
+    msg=str(exc)
+    self.root.after(0,lambda:messagebox.showerror("Update failed",msg))
+  threading.Thread(target=worker,daemon=True).start()
+ def install_update(self,archive):
+  try:
+   updater.install_windows_release(archive)
+  except Exception as exc:
+   messagebox.showerror("Update failed",str(exc))
+   return
+  self.root.destroy()
  def render_sliders(self):
   if not hasattr(self,"slider_notebook"):return
   for tab in self.slider_notebook.tabs():self.slider_notebook.forget(tab)
