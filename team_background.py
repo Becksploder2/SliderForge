@@ -32,18 +32,18 @@ class TeamBackground:
         self.opacity = tk.IntVar(value=max(5, min(40, int(self.prefs["opacity"]))))
         self.frame = ttk.Frame(parent)
         self.frame.pack(fill="x", pady=(0, 8))
-        self.canvas = tk.Canvas(self.frame, height=118, bg="#18251d", highlightthickness=0)
+        self.canvas = tk.Canvas(self.frame, height=76, bg="#18251d", highlightthickness=0)
         self.canvas.pack(fill="x")
         self.photo = None
         controls = ttk.Frame(self.frame)
-        controls.pack(fill="x", pady=(5, 0))
+        controls.pack(fill="x", pady=(2, 0))
         ttk.Label(controls, text="Background:").pack(side="left")
         ttk.Checkbutton(controls, text="On", variable=self.enabled, command=self.changed).pack(side="left", padx=5)
         ttk.Combobox(controls, textvariable=self.side, state="readonly", width=13,
                      values=["YOUR TEAM", "OPPONENT", "HOME", "AWAY"]).pack(side="left", padx=5)
         ttk.Label(controls, text="Opacity").pack(side="left", padx=(10, 3))
         tk.Scale(controls, from_=5, to=40, orient="horizontal", variable=self.opacity,
-                 length=125, bg="#17221d", fg="white", highlightthickness=0,
+                 length=92, bg="#17221d", fg="white", highlightthickness=0,
                  troughcolor="#3e5c48", showvalue=True, command=lambda _: self.changed()).pack(side="left")
         ttk.Button(controls, text="Import logo", command=self.import_logo).pack(side="left", padx=4)
         ttk.Button(controls, text="Import stadium", command=self.import_stadium).pack(side="left", padx=4)
@@ -108,7 +108,7 @@ class TeamBackground:
             return
         team = self.selected_team()
         width = max(350, self.canvas.winfo_width())
-        height = 118
+        height = 76
         accent = COLORS.get(team, "#264d42")
         self.canvas.configure(bg=accent if self.enabled.get() else "#17221d")
         self.canvas.delete("all")
@@ -143,19 +143,19 @@ class TeamBackground:
                     from PIL import Image, ImageTk
                     with Image.open(path) as raw:
                         image = raw.convert("RGBA")
-                        image.thumbnail((int(width * .48), 106), Image.Resampling.LANCZOS)
+                        image.thumbnail((int(width * .42), 68), Image.Resampling.LANCZOS)
                         alpha = image.getchannel("A").point(lambda a: int(a * self.opacity.get() / 100))
                         image.putalpha(alpha)
                         self.photo = ImageTk.PhotoImage(image)
-                        self.canvas.create_image(width * .69, 59, image=self.photo)
+                        self.canvas.create_image(width * .69, 38, image=self.photo)
                 except (ImportError, OSError, ValueError):
                     self.photo = None
             if self.photo is None:
-                self.canvas.create_text(width * .71, 57, text=initials(team),
-                                        fill="#8f9b9b", font=("Segoe UI", 45, "bold"))
-        self.canvas.create_text(22, 28, anchor="w", text="SLIDERFORGE",
-                                fill="#ffffff", font=("Segoe UI", 23, "bold"))
-        self.canvas.create_text(22, 67, anchor="w", text=team,
-                                fill="#ffffff", font=("Segoe UI", 15, "bold"))
-        self.canvas.create_text(22, 97, anchor="w", text=self.game.get() + " • " + stadium_label(team, self.game.get()),
+                self.canvas.create_text(width * .71, 38, text=initials(team),
+                                        fill="#8f9b9b", font=("Segoe UI", 31, "bold"))
+        self.canvas.create_text(16, 18, anchor="w", text="SLIDERFORGE",
+                                fill="#ffffff", font=("Segoe UI", 17, "bold"))
+        self.canvas.create_text(16, 43, anchor="w", text=team,
+                                fill="#ffffff", font=("Segoe UI", 12, "bold"))
+        self.canvas.create_text(16, 65, anchor="w", text=self.game.get() + " • " + stadium_label(team, self.game.get()),
                                 fill="#e2e8ea", font=("Segoe UI", 10))
