@@ -10,6 +10,12 @@ The desktop app is written in Python/Tkinter. It includes game selections for **
 2. Run `INSTALL_BRANDING.bat` to install Pillow for properly scaled logos and stadium photos.
 3. Optionally run `INSTALL_CAPTURE.bat` to enable the capture-card workflow.
 
+## Dynamic team backgrounds (desktop)
+
+The native Tkinter app now displays a team-colored header with a logo watermark, updated automatically when your team, opponent, game, or venue changes. Select YOUR TEAM, OPPONENT, HOME or AWAY as the background source. Control opacity (5–40%) or switch the background off. Use **Import team logo** to save a local PNG, JPG, or WebP image for the currently selected team. Imported logos are stored through `branding.py`, without downloading protected team marks. Where no image is imported, team initials are shown instead. The earlier HTML prototype remains separate.
+
+The current implementation decorates the header area, not the entire slider grid. The desktop application has not yet been tested on a physical Windows machine.
+
 ## Stadium Experience (v1.3)
 
 Select a team to change the stadium-name banner and foreground team logo. Stadium photographs and official team logos **are not bundled**; the app uses a generic field and initials until images are imported. The team-to-stadium name mapping is currently partial and can be expanded.
