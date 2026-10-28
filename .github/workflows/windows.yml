@@ -3,6 +3,8 @@ name: Build SliderForge Windows
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
