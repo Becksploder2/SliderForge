@@ -1,54 +1,68 @@
-name: Build SliderForge Windows
+name: Build and Release SliderForge Windows
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
 
 permissions:
   contents: write
+
+concurrency:
+  group: sliderforge-windows-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - name: Check out code
+      - name: Check out source
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install dependencies
+
+      - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install Pillow pyinstaller
-      - name: Compile source
-        run: |
-          python -m py_compile SliderForge.py branding.py team_background.py updater.py
-      - name: Build Windows app
-        run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name SliderForge --add-data "cfb27_official_ratings.csv;." --icon sliderforge.ico SliderForge.py
-      - name: Package Windows ZIP for updater
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Check application syntax
+        run: python -m py_compile SliderForge.py branding.py team_background.py updater.py
+
+      - name: Build standalone Windows executable
+        run: >
+          pyinstaller --noconfirm --clean --onefile --windowed
+          --name SliderForge --icon sliderforge.ico
+          --add-data "cfb27_official_ratings.csv;."
+          SliderForge.py
+
+      - name: Package updater ZIP
         shell: pwsh
         run: |
           Compress-Archive -Path dist/SliderForge.exe,README_v1_3.md -DestinationPath dist/SliderForge_Windows.zip -Force
-      - name: Upload Windows executable artifact
+          $checksum = (Get-FileHash dist/SliderForge_Windows.zip -Algorithm SHA256).Hash.ToLower()
+          "$checksum  SliderForge_Windows.zip" | Set-Content -Path dist/SHA256SUMS.txt -Encoding ascii
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: SliderForge-Windows
           path: |
             dist/SliderForge.exe
             dist/SliderForge_Windows.zip
+            dist/SHA256SUMS.txt
           if-no-files-found: error
-      - name: Publish tagged release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/SliderForge.exe
-            dist/SliderForge_Windows.zip
-          prerelease: true
-          generate_release_notes: true
+
+      - name: Publish automatic beta release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v1.3.${{ github.run_number }}
+          RELEASE_SHA: ${{ github.sha }}
+        shell: pwsh
+        run: |
+          gh release create $env:RELEASE_TAG dist/SliderForge.exe dist/SliderForge_Windows.zip dist/SHA256SUMS.txt --target $env:RELEASE_SHA --title "SliderForge Beta $env:RELEASE_TAG" --prerelease --generate-notes
