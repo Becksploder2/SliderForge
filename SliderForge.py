@@ -4,6 +4,7 @@ from tkinter import ttk, filedialog, messagebox
 import sqlite3, csv, json
 import sys
 from pathlib import Path
+from team_background import TeamBackground
 
 ROOT=Path.home()/".sliderforge"
 ROOT.mkdir(exist_ok=True)
@@ -71,6 +72,7 @@ class App:
   frame=ttk.Frame(root,padding=16);frame.pack(fill="both",expand=True)
   ttk.Label(frame,text="SLIDERFORGE",style="Title.TLabel").pack(anchor="w")
   ttk.Label(frame,text="YOUR GAME. YOUR DIFFICULTY. YOUR RULES.  •  Recommendations only; apply in-game manually").pack(anchor="w",pady=(0,15))
+  self.team_background=TeamBackground(frame,self.game,self.primary_team,self.opponent,self.venue)
   top=ttk.Frame(frame);top.pack(fill="x")
   self.field(top,"Game",self.game,GAME_CHOICES,width=22)
   self.mode_tabs=ttk.Notebook(frame)
