@@ -25,10 +25,10 @@ jobs:
           python -m pip install Pillow pyinstaller
       - name: Compile source
         run: |
-          python -m py_compile SliderForge.py branding.py updater.py
+          python -m py_compile SliderForge.py branding.py team_background.py updater.py
       - name: Build Windows app
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name SliderForge --add-data "cfb27_official_ratings.csv;." SliderForge.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name SliderForge --add-data "cfb27_official_ratings.csv;." --icon sliderforge.ico SliderForge.py
       - name: Package Windows ZIP for updater
         shell: pwsh
         run: |
